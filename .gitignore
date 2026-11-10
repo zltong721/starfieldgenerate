@@ -1,0 +1,25 @@
+# Generated datasets and Gaia response caches
+data/generated/
+**/gaia_cache/
+**/gaia_cache_expanded/
+*.fits
+*.npz
+*.png
+*.partial.*
+
+# Runtime files
+runs/
+weights/
+*.log
+*.lock
+pid.txt
+
+# Python and local environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
