@@ -71,7 +71,7 @@ def split_sky_areas(clusters, downloads, seed):
 
 def preview(fits_path, png_path):
     with fits.open(fits_path, memmap=True) as h:
-        frame = np.asarray(h[0].data[0], dtype=np.float32)
+        frame = np.asarray(h['GROUNDTRUTH'].data, dtype=np.float32)
     low, high = np.percentile(frame, [1, 99.8])
     image = np.clip(np.arcsinh(np.maximum(frame-low, 0)) /
                     np.arcsinh(max(high-low, 1)), 0, 1)
@@ -245,8 +245,7 @@ def main():
                     sources = len(stars)
                     del renderer, video, truth
                     if torch.cuda.is_available(): torch.cuda.empty_cache()
-                if not png.exists():
-                    preview(output, png)
+                preview(output, png)
                 manifest['records'].append(dict(file=output.name, npz=destination.name,
                     png=png.name, split=assignment[cluster_index],
                     cluster=cluster['name'], view=view_index, offset_arcsec=actual_offset,

@@ -21,6 +21,6 @@ python -u -m dancecam.opencluster_batch --config configs/mutian_193_r.json --cat
 
 脚本会访问 ARI Gaia TAP 服务，并把查询结果缓存在输出目录。当前批量脚本还要求输出目录中预先存在 `manifest.json`，因此不能直接从空目录启动；再次执行时会检查已有 FITS 文件，再继续缺失的条目。续跑时不要修改配置、星团清单或 Gaia 缓存。脚本会在剩余磁盘空间低于 10 GiB 前停止；完整数据集还需要大量磁盘空间。该命令只生成数据，不启动模型训练。
 
-每个 `<名称>.fits` 包含模拟视频、无噪声真值 `GROUNDTRUTH`、恒星表和完整配置；对应的 `sequence_<名称>.npz` 是供训练使用的无损压缩副本。脚本还生成 `<名称>.png` 预览。`manifest_5000.json` 记录已生成条目，`batch_status.json` 记录进度。划分文件将相互重叠的天空区域归入同一训练、验证或测试集合。
+每个 `<名称>.fits` 包含模拟视频、无噪声真值 `GROUNDTRUTH`、恒星表和完整配置；对应的 `sequence_<名称>.npz` 是供训练使用的无损压缩副本。脚本还将 FITS 中的 `GROUNDTRUTH` 转换为 `<名称>.png` 预览图。`manifest_5000.json` 记录已生成条目，`batch_status.json` 记录进度。划分文件将相互重叠的天空区域归入同一训练、验证或测试集合。
 
 FITS、NPZ、PNG、Gaia 查询缓存、日志和模型检查点由 `.gitignore` 排除；`data/generate/` 中的 JSON 状态及清单文件目前未被排除。若需逐字节重现输出，还需要保留相同的 Gaia 查询结果，并使用兼容的数值软件与硬件环境。
