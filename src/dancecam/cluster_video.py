@@ -46,6 +46,7 @@ def fetch(cluster, cfg, cache):
                     raise ValueError(content[:500])
                 if len(table) >= 100000:
                     raise ValueError('Possible truncated Gaia response')
+                path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding='utf-8')
                 path.with_suffix('.adql').write_text(query, encoding='utf-8')
                 break

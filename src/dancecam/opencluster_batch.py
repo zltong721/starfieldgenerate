@@ -112,14 +112,18 @@ def main():
     parser.add_argument('--catalog', type=Path, default=Path('data/source/catalogs/Hunt_Reffert_2024_Gaia_100_candidates.md'))
     parser.add_argument('--out', type=Path, default=Path('data/generated/opencluster'))
     parser.add_argument('--device', default='cuda')
+    parser.add_argument('--split', choices=('train', 'validation', 'test'))
+    parser.add_argument('--limit-sequences', type=int)
     args = parser.parse_args()
+    if args.limit_sequences is not None and not 1 <= args.limit_sequences <= 5000:
+        parser.error('--limit-sequences must be between 1 and 5000')
     cfg = json.loads(args.config.read_text(encoding='utf-8'))
     clusters = read_clusters(args.catalog)
     if len(clusters) != 100:
         parser.error(f'Expected 100 catalog clusters, got {len(clusters)}')
     args.out.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(args.out).free
-    missing = 5000 - len(list(args.out.glob('*.fits')))
+    missing = (args.limit_sequences or 5000) - len(list(args.out.glob('*.fits')))
     required = missing * 34 * 1024**2 + 10 * 1024**3
     print(f'Free {free/1024**3:.1f} GiB; estimated reserve {required/1024**3:.1f} GiB', flush=True)
     if free < required:
@@ -129,7 +133,8 @@ def main():
         import msvcrt
         lock.seek(0); lock.write(b'0'); lock.flush(); lock.seek(0)
         msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
-    status_path = args.out/'batch_status.json'
+    partial = args.split is not None or args.limit_sequences is not None
+    status_path = args.out/('batch_status_test.json' if partial else 'batch_status.json')
     cache = args.out/'gaia_cache_expanded'
     cache.mkdir(exist_ok=True)
     try:
@@ -152,15 +157,21 @@ def main():
                 split['files'][assignment[i]].append('sequence_' + stem + '.npz')
         write_json(args.out/'split_5000.json', split)
         print('Sky-area split:', {k: len(v) for k,v in split['clusters'].items()}, flush=True)
-        manifest_path = args.out/'manifest_5000.json'
+        manifest_path = args.out/('manifest_test.json' if partial else 'manifest_5000.json')
         manifest = dict(config=cfg, catalog=str(args.catalog.resolve()),
                         description='100 Gaia clusters, 50 distinct pointings each',
                         offsets_arcsec=offsets, records=[])
-        old_manifest = json.loads((args.out/'manifest.json').read_text(encoding='utf-8'))
+        old_path = args.out/'manifest.json'
+        old_manifest = json.loads(old_path.read_text(encoding='utf-8')) if old_path.exists() else {'records': []}
         previous = {r.get('file', r.get('fits')): r for r in old_manifest['records']}
         completed = 0
+        total = args.limit_sequences or (sum(label == args.split for label in assignment.values()) * 50 if args.split else 5000)
         for view_index, (dx, dy) in enumerate(offsets):
             for cluster_index, (cluster, path) in enumerate(downloads):
+                if args.split and assignment[cluster_index] != args.split:
+                    continue
+                if completed >= total:
+                    break
                 idx = view_index*len(clusters)+cluster_index
                 name = f'{cluster_index:03d}_{cluster["name"]}'
                 if view_index:
@@ -243,9 +254,11 @@ def main():
                 completed += 1
                 write_json(manifest_path, manifest)
                 write_json(status_path, dict(phase='generating', completed=completed,
-                    total=5000, last_file=output.name, pid=os.getpid(), updated=time.time()))
-                print(f'{completed}/5000 {output.name}: {sources} Gaia stars', flush=True)
-        write_json(status_path, dict(phase='complete', completed=5000, total=5000,
+                    total=total, last_file=output.name, pid=os.getpid(), updated=time.time()))
+                print(f'{completed}/{total} {output.name}: {sources} Gaia stars', flush=True)
+            if completed >= total:
+                break
+        write_json(status_path, dict(phase='complete', completed=completed, total=total,
                                     pid=os.getpid(), updated=time.time()))
     except BaseException as exc:
         write_json(status_path, dict(phase='failed', error=repr(exc), pid=os.getpid(), updated=time.time()))
